@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Neon Serpent — Advanced Arcade Snake</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       CSS VARIABLES & RESET
+       ========================================================================== */
+    :root {
+      --bg-deep: #070913;
+      --bg-panel: rgba(15, 21, 42, 0.86);
+      --border-glow: rgba(56, 189, 248, 0.35);
+      --neon-cyan: #22d3ee;
+      --neon-emerald: #10b981;
+      --neon-pink: #f43f5e;
+      --neon-amber: #f59e0b;
+      --neon-violet: #a855f7;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 15%, #131c38 0%, var(--bg-deep) 75%);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Subtle animated cyber grid background */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+      background-size: 36px 36px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ==========================================================================
+       HEADER & HUD BAR
+       ========================================================================== */
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 680px;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px;
+      gap: 8px;
+    }
+
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 16px;
+      padding: 8px 12px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      flex-shrink: 0;
+    }
+
+    .stats-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      display: flex;
+      flex-direction: column;
+      background: rgba(7, 11, 25, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 4px 10px;
+      min-width: 64px;
+    }
+
+    .stat-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .stat-value {
+      font-family: 'Orbitron', monospace;
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--neon-cyan);
+      line-height: 1.2;
+    }
+
+    .stat-pill.high .stat-value { color: var(--neon-amber); }
+    .stat-pill.level .stat-value { color: var(--neon-violet); }
+
+    .combo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-family: 'Orbitron', monospace;
+      font-size: 0.78rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.25), rgba(245, 158, 11, 0.25));
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #fde047;
+      opacity: 0;
+      transform: scale(0.85);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .combo-badge.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .shield-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(34, 211, 238, 0.2);
+      border: 1px solid var(--neon-cyan);
+      color: #a5f3fc;
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+      display: none;
+    }
+
+    .shield-badge.active {
+      display: inline-flex;
+      animation: pulseShield 1.4s infinite alternate;
+    }
+
+    @keyframes pulseShield {
+      from { box-shadow: 0 0 6px rgba(34, 211, 238, 0.3); }
+      to { box-shadow: 0 0 16px rgba(34, 211, 238, 0.8); }
+    }
+
+    .hud-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(30, 41, 59, 0.75);
+      color: var(--text-main);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--neon-cyan);
+      transform: translateY(-1px);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* ==========================================================================
+       LEVEL PROGRESS BAR
+       ========================================================================== */
+    .level-bar-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+
+    .level-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+
+    .progress-track {
+      flex: 1;
+      height: 7px;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-violet), var(--neon-pink));
+      transition: width 0.3s ease;
+    }
+
+    /* ==========================================================================
+       GAME ARENA CONTAINER & CANVAS
+       ========================================================================== */
+    .arena-wrapper {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .canvas-frame {
+      position: relative;
+      border-radius: 18px;
+      padding: 4px;
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.55), rgba(168, 85, 247, 0.55), rgba(244, 63, 94, 0.55));
+      box-shadow: 0 0 35px rgba(34, 211, 238, 0.18), 0 18px 40px rgba(0, 0, 0, 0.65);
+      transition: transform 0.08s ease;
+    }
+
+    .canvas-frame.shake {
+      animation: arenaShake 0.32s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
+    @keyframes arenaShake {
+      10%, 90% { transform: translate3d(-2px, 1px, 0); }
+      20%, 80% { transform: translate3d(3px, -2px, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 2px, 0); }
+      40%, 60% { transform: translate3d(4px, -1px, 0); }
+    }
+
+    canvas {
+      display: block;
+      border-radius: 14px;
+      background: #090d1e;
+      touch-action: none;
+    }
+
+    /* Level Up Banner Toast inside Canvas Frame */
+    .level-toast {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.92), rgba(34, 211, 238, 0.92));
+      color: #fff;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 800;
+      font-size: 0.92rem;
+      letter-spacing: 0.06em;
+      padding: 8px 18px;
+      border-radius: 999px;
+      box-shadow: 0 8px 25px rgba(168, 85, 247, 0.5);
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 5;
+      white-space: nowrap;
+    }
+
+    .level-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ==========================================================================
+       MODALS / OVERLAYS (START, PAUSE, GAME OVER)
+       ========================================================================== */
+    .overlay {
+      position: absolute;
+      inset: 4px;
+      border-radius: 14px;
+      background: rgba(7, 10, 24, 0.88);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      text-align: center;
+      z-index: 10;
+      overflow-y: auto;
+      transition: opacity 0.22s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .game-logo {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.5rem, 4.5vw, 2.2rem);
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      background: linear-gradient(90deg, #22d3ee, #34d399, #f472b6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      max-width: 420px;
+    }
+
+    /* Level Selector Pills */
+    .level-selector {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .lvl-chip {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(30, 41, 59, 0.65);
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .lvl-chip.selected {
+      background: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 14px rgba(34, 211, 238, 0.35);
+    }
+
+    /* Simple Explanation Card */
+    .guide-box {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      text-align: left;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      color: #cbd5e1;
+    }
+
+    .guide-title {
+      font-weight: 700;
+      color: var(--neon-cyan);
+      margin-bottom: 6px;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .guide-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+    }
+
+    .dot-icon {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    .primary-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.98rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      padding: 12px 28px;
+      border-radius: 999px;
+      border: none;
+      color: #050814;
+      background: linear-gradient(135deg, #22d3ee 0%, #34d399 100%);
+      box-shadow: 0 6px 24px rgba(34, 211, 238, 0.45);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 10px 28px rgba(52, 211, 153, 0.55);
+    }
+
+    .primary-btn:active {
+      transform: scale(0.96);
+    }
+
+    .secondary-btn {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 10px 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(30, 41, 59, 0.8);
+      color: var(--text-main);
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .summary-cards {
+      display: flex;
+      gap: 12px;
+      margin: 12px 0 16px;
+    }
+
+    .summary-card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 10px 16px;
+      min-width: 95px;
+    }
+
+    .new-record-tag {
+      display: inline-block;
+      background: linear-gradient(90deg, #f59e0b, #ec4899);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ==========================================================================
+       MOBILE ON-SCREEN D-PAD CONTROLS
+       ========================================================================== */
+    .mobile-controls {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding-bottom: 4px;
+      flex-shrink: 0;
+    }
+
+    .dpad-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .dpad-btn {
+      width: 56px;
+      height: 50px;
+      border-radius: 14px;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(15, 23, 42, 0.88);
+      color: var(--neon-cyan);
+      font-size: 1.25rem;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .dpad-btn:active {
+      background: rgba(34, 211, 238, 0.28);
+      transform: scale(0.92);
+    }
+
+    .footer-hint {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 768px), (pointer: coarse) {
+      .mobile-controls {
+        display: flex;
+      }
+      .footer-hint {
+        display: none;
+      }
+    }
+
+    @media (max-width: 440px) {
+      .guide-grid {
+        grid-template-columns: 1fr;
+      }
+      .stat-pill {
+        padding: 3px 8px;
+        min-width: 54px;
+      }
+      .stat-value {
+        font-size: 0.92rem;
+      }
+      .dpad-btn {
+        width: 52px;
+        height: 46px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-shell">
+    <!-- TOP HUD BAR -->
+    <header class="hud-header">
+      <div class="stats-group">
+        <div class="stat-pill">
+          <span class="stat-label">Score</span>
+          <span class="stat-value" id="scoreVal">0</span>
+        </div>
+        <div class="stat-pill high">
+          <span class="stat-label">Best</span>
+          <span class="stat-value" id="highScoreVal">0</span>
+        </div>
+        <div class="stat-pill level">
+          <span class="stat-label">Level</span>
+          <span class="stat-value" id="levelVal">1</span>
+        </div>
+        <span class="combo-badge" id="comboBadge">2x COMBO</span>
+        <span class="shield-badge" id="shieldBadge">🛡️ PHASE SHIELD</span>
+      </div>
+
+      <div class="hud-actions">
+        <button class="icon-btn" id="soundBtn" title="Toggle Sound" aria-label="Toggle Sound">🔊</button>
+        <button class="icon-btn" id="pauseBtn" title="Pause / Resume (Space)" aria-label="Pause Game">⏸️</button>
+        <button class="icon-btn" id="restartTopBtn" title="Restart Game" aria-label="Restart Game">🔄</button>
+      </div>
+    </header>
+
+    <!-- LEVEL PROGRESS BAR -->
+    <div class="level-bar-wrap">
+      <span class="level-title" id="levelNameLabel">LVL 1 • NEON MEADOW</span>
+      <div class="progress-track">
+        <div class="progress-fill" id="levelProgressFill"></div>
+      </div>
+      <span class="level-title" id="nextLevelLabel">Next: 80</span>
+    </div>
+
+    <!-- MAIN GAME ARENA -->
+    <main class="arena-wrapper" id="arenaWrapper">
+      <div class="canvas-frame" id="canvasFrame">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- LEVEL UP FLOATING BANNER -->
+        <div class="level-toast" id="levelToast">LEVEL 2 UNLOCKED!</div>
+
+        <!-- START OVERLAY -->
+        <section class="overlay" id="startOverlay">
+          <h1 class="game-logo">NEON SERPENT</h1>
+          <p class="subtitle">Master progressive arenas, chain rapid combos, and collect cyber power-ups!</p>
+
+          <div class="level-selector" id="levelSelector">
+            <button class="lvl-chip selected" data-lvl="1">Lvl 1: Meadow</button>
+            <button class="lvl-chip" data-lvl="2">Lvl 2: Pillars</button>
+            <button class="lvl-chip" data-lvl="3">Lvl 3: Crossfire</button>
+            <button class="lvl-chip" data-lvl="4">Lvl 4: Laser Gates</button>
+            <button class="lvl-chip" data-lvl="5">Lvl 5: Overdrive</button>
+          </div>
+
+          <div class="guide-box">
+            <div class="guide-title">How to Play & Power-Ups</div>
+            <div class="guide-grid">
+              <div class="guide-item">
+                <span class="dot-icon" style="background:#f43f5e; box-shadow:0 0 8px #f43f5e;"></span>
+                <span><strong>Cyber Orb (+10):</strong> Grows snake & builds fast-eat Combo multiplier.</span>
+              </div>
+              <div class="guide-item">
+                <span class="dot-icon" style="background:#f59e0b; box-shadow:0 0 8px #f59e0b;"></span>
+                <span><strong>Golden Star (+50):</strong> Timed bonus berry! Grab before its ring shrinks.</span>
+              </div>
+              <div class="guide-item">
+                <span class="dot-icon" style="background:#22d3ee; box-shadow:0 0 8px #22d3ee;"></span>
+                <span><strong>Phase Shield:</strong> Protects you once from crashing into walls or obstacles!</span>
+              </div>
+              <div class="guide-item">
+                <span class="dot-icon" style="background:#a855f7; box-shadow:0 0 8px #a855f7;"></span>
+                <span><strong>Controls:</strong> Arrow Keys / WASD on PC, or Swipe / D-Pad on Mobile.</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="primary-btn" id="startBtn">PLAY NOW</button>
+        </section>
+
+        <!-- PAUSE OVERLAY -->
+        <section class="overlay hidden" id="pauseOverlay">
+          <h2 class="game-logo" style="font-size:1.7rem;">GAME PAUSED</h2>
+          <p class="subtitle">Take a breather. Your current run is safely suspended.</p>
+          <button class="primary-btn" id="resumeBtn">RESUME</button>
+          <button class="secondary-btn" id="pauseRestartBtn">Restart Run</button>
+        </section>
+
+        <!-- GAME OVER OVERLAY -->
+        <section class="overlay hidden" id="gameOverOverlay">
+          <span class="new-record-tag hidden" id="newRecordBadge">🏆 NEW HIGH SCORE!</span>
+          <h2 class="game-logo" style="font-size:1.8rem;">SYSTEM CRASH</h2>
+          <p class="subtitle" id="deathReasonText">You collided with a neon barrier.</p>
+
+          <div class="summary-cards">
+            <div class="summary-card">
+              <div class="stat-label">Final Score</div>
+              <div class="stat-value" id="finalScoreVal">0</div>
+            </div>
+            <div class="summary-card high">
+              <div class="stat-label">Best Score</div>
+              <div class="stat-value" id="finalBestVal">0</div>
+            </div>
+            <div class="summary-card level">
+              <div class="stat-label">Level Reached</div>
+              <div class="stat-value" id="finalLevelVal">1</div>
+            </div>
+          </div>
+
+          <button class="primary-btn" id="playAgainBtn">PLAY AGAIN</button>
+        </section>
+      </div>
+    </main>
+
+    <!-- MOBILE TOUCH D-PAD -->
+    <div class="mobile-controls" aria-label="Touch Directional Pad">
+      <div class="dpad-row">
+        <button class="dpad-btn" data-dir="UP" aria-label="Move Up">▲</button>
+      </div>
+      <div class="dpad-row">
+        <button class="dpad-btn" data-dir="LEFT" aria-label="Move Left">◀</button>
+        <button class="dpad-btn" data-dir="DOWN" aria-label="Move Down">▼</button>
+        <button class="dpad-btn" data-dir="RIGHT" aria-label="Move Right">▶</button>
+      </div>
+    </div>
+
+    <div class="footer-hint">
+      Desktop: <strong>Arrow Keys</strong> or <strong>WASD</strong> to steer • <strong>Space</strong> to Pause • <strong>R</strong> to Restart
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * NEON SERPENT — COMPLETE SINGLE-FILE ARCADE SNAKE ENGINE
+     * ============================================================================
+     */
+    (() => {
+      'use strict';
+
+      // --------------------------------------------------------------------------
+      // 1. PROCEDURAL WEB AUDIO SOUND ENGINE (No external files required)
+      // --------------------------------------------------------------------------
+      class SoundFX {
+        constructor() {
+          this.ctx = null;
+          this.muted = localStorage.getItem('neonSerpentMuted') === 'true';
+        }
+
+        init() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        }
+
+        toggleMute() {
+          this.muted = !this.muted;
+          localStorage.setItem('neonSerpentMuted', this.muted);
+          return this.muted;
+        }
+
+        playTone(freq, type, duration, vol = 0.14, slideTo = null) {
+          if (this.muted) return;
+          this.init();
+          if (!this.ctx) return;
+
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+          if (slideTo) {
+            osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+          }
+
+          gain.gain.setValueAtTime(vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now);
+          osc.stop(now + duration);
+        }
+
+        eat(combo = 1) {
+          const base = 360 + Math.min(combo, 8) * 45;
+          this.playTone(base, 'sine', 0.11, 0.15, base * 1.45);
+        }
+
+        bonus() {
+          this.playTone(587.33, 'triangle', 0.09, 0.16);
+          setTimeout(() => this.playTone(880, 'triangle', 0.18, 0.16), 75);
+        }
+
+        shieldPickup() {
+          this.playTone(320, 'sine', 0.25, 0.16, 760);
+        }
+
+        shieldBreak() {
+          this.playTone(420, 'sawtooth', 0.22, 0.16, 140);
+        }
+
+        levelUp() {
+          const notes = [440, 554.37, 659.25, 880];
+          notes.forEach((n, idx) => {
+            setTimeout(() => this.playTone(n, 'triangle', 0.16, 0.16), idx * 75);
+          });
+        }
+
+        gameOver() {
+          this.playTone(220, 'sawtooth', 0.28, 0.18, 65);
+          setTimeout(() => this.playTone(140, 'sawtooth', 0.35, 0.16, 48), 160);
+        }
+      }
+
+      const sfx = new SoundFX();
+
+      // --------------------------------------------------------------------------
+      // 2. LEVEL DEFINITIONS & ARENA CONFIGURATIONS
+      // --------------------------------------------------------------------------
+      const GRID_SIZE = 22; // 22x22 logical grid
+      const LEVEL_CONFIGS = [
+        {
+          level: 1,
+          name: 'NEON MEADOW',
+          speedMs: 132,
+          pointsToNext: 80,
+          accent: '#22d3ee',
+          obstacles: () => []
+        },
+        {
+          level: 2,
+          name: 'TWIN PILLARS',
+          speedMs: 118,
+          pointsToNext: 180,
+          accent: '#34d399',
+          obstacles: () => {
+            const obs = [];
+            for (let y = 5; y <= 16; y++) {
+              if (y === 10 || y === 11) continue; // Center gap
+              obs.push({ x: 6, y });
+              obs.push({ x: 15, y });
+            }
+            return obs;
+          }
+        },
+        {
+          level: 3,
+          name: 'CROSSFIRE MAZE',
+          speedMs: 106,
+          pointsToNext: 300,
+          accent: '#a855f7',
+          obstacles: () => {
+            const obs = [];
+            // Four L-shaped corner bastions
+            const corners = [
+              { cx: 4, cy: 4, dx: 1, dy: 1 },
+              { cx: 17, cy: 4, dx: -1, dy: 1 },
+              { cx: 4, cy: 17, dx: 1, dy: -1 },
+              { cx: 17, cy: 17, dx: -1, dy: -1 }
+            ];
+            corners.forEach(c => {
+              for (let i = 0; i < 4; i++) {
+                obs.push({ x: c.cx + c.dx * i, y: c.cy });
+                if (i > 0) obs.push({ x: c.cx, y: c.cy + c.dy * i });
+              }
+            });
+            return obs;
+          }
+        },
+        {
+          level: 4,
+          name: 'LASER GATES',
+          speedMs: 96,
+          pointsToNext: 450,
+          accent: '#f59e0b',
+          obstacles: () => {
+            const obs = [];
+            // Horizontal gates & central core blocks
+            for (let x = 3; x <= 7; x++) {
+              obs.push({ x, y: 6 });
+              obs.push({ x: GRID_SIZE - 1 - x, y: 15 });
+            }
+            for (let y = 8; y <= 13; y++) {
+              obs.push({ x: 10, y });
+              obs.push({ x: 11, y });
+            }
+            return obs;
+          }
+        },
+        {
+          level: 5,
+          name: 'OVERDRIVE CORE',
+          speedMs: 86,
+          pointsToNext: Infinity,
+          accent: '#f43f5e',
+          obstacles: () => {
+            const obs = [];
+            // Symmetrical diamond & outer pylons
+            const coords = [
+              [5,5],[6,5],[5,6],
+              [16,5],[15,5],[16,6],
+              [5,16],[6,16],[5,15],
+              [16,16],[15,16],[16,15],
+              [10,4],[11,4],[10,17],[11,17],
+              [4,10],[4,11],[17,10],[17,11]
+            ];
+            coords.forEach(([x, y]) => obs.push({ x, y }));
+            return obs;
+          }
+        }
+      ];
+
+      // --------------------------------------------------------------------------
+      // 3. DOM REFERENCES
+      // --------------------------------------------------------------------------
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const arenaWrapper = document.getElementById('arenaWrapper');
+      const canvasFrame = document.getElementById('canvasFrame');
+
+      const scoreVal = document.getElementById('scoreVal');
+      const highScoreVal = document.getElementById('highScoreVal');
+      const levelVal = document.getElementById('levelVal');
+      const comboBadge = document.getElementById('comboBadge');
+      const shieldBadge = document.getElementById('shieldBadge');
+      const levelNameLabel = document.getElementById('levelNameLabel');
+      const nextLevelLabel = document.getElementById('nextLevelLabel');
+      const levelProgressFill = document.getElementById('levelProgressFill');
+      const levelToast = document.getElementById('levelToast');
+
+      const startOverlay = document.getElementById('startOverlay');
+      const pauseOverlay = document.getElementById('pauseOverlay');
+      const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+      const soundBtn = document.getElementById('soundBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const restartTopBtn = document.getElementById('restartTopBtn');
+
+      // --------------------------------------------------------------------------
+      // 4. GAME STATE
+      // --------------------------------------------------------------------------
+      let cellPx = 20;
+      let highScore = parseInt(localStorage.getItem('neonSerpentHighScore') || '0', 10);
+      highScoreVal.textContent = highScore;
+      soundBtn.textContent = sfx.muted ? '🔇' : '🔊';
+
+      let selectedStartLevel = 1;
+
+      const state = {
+        status: 'START', // 'START' | 'PLAYING' | 'PAUSED' | 'GAMEOVER'
+        score: 0,
+        level: 1,
+        levelStartScore: 0,
+        snake: [],
+        dir: { x: 1, y: 0 },
+        inputQueue: [],
+        obstacles: [],
+        food: null,         // Regular orb
+        bonusItem: null,    // { x, y, type: 'STAR' | 'SHIELD', expiresAt, duration }
+        hasShield: false,
+        invulnTicks: 0,     // Brief grace ticks after shield save or level transition
+        combo: 1,
+        lastEatTime: 0,
+        particles: [],
+        floatingTexts: [],
+        lastStepTime: 0,
+        animFrameId: null
+      };
+
+      // --------------------------------------------------------------------------
+      // 5. RESPONSIVE CANVAS SIZING
+      // --------------------------------------------------------------------------
+      function resizeCanvas() {
+        const rect = arenaWrapper.getBoundingClientRect();
+        const availableSize = Math.floor(Math.min(rect.width - 12, rect.height - 12));
+        const clampedSize = Math.max(240, Math.min(availableSize, 580));
+        cellPx = Math.floor(clampedSize / GRID_SIZE);
+        const exactCanvasPx = cellPx * GRID_SIZE;
+
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = exactCanvasPx * dpr;
+        canvas.height = exactCanvasPx * dpr;
+        canvas.style.width = `${exactCanvasPx}px`;
+        canvas.style.height = `${exactCanvasPx}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        draw();
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+
+      // --------------------------------------------------------------------------
+      // 6. HELPER FUNCTIONS (SPAWNING, PARTICLES, HUD)
+      // --------------------------------------------------------------------------
+      function getLevelConfig(lvl) {
+        return LEVEL_CONFIGS[Math.min(lvl - 1, LEVEL_CONFIGS.length - 1)];
+      }
+
+      function isCellOccupied(x, y) {
+        if (state.snake.some(seg => seg.x === x && seg.y === y)) return true;
+        if (state.obstacles.some(obs => obs.x === x && obs.y === y)) return true;
+        if (state.food && state.food.x === x && state.food.y === y) return true;
+        if (state.bonusItem && state.bonusItem.x === x && state.bonusItem.y === y) return true;
+        return false;
+      }
+
+      function findSafeFreeCell(avoidHeadRadius = 2) {
+        const head = state.snake[0];
+        const candidates = [];
+
+        for (let y = 1; y < GRID_SIZE - 1; y++) {
+          for (let x = 1; x < GRID_SIZE - 1; x++) {
+            if (isCellOccupied(x, y)) continue;
+            if (head && Math.abs(x - head.x) + Math.abs(y - head.y) <= avoidHeadRadius) continue;
+            candidates.push({ x, y });
+          }
+        }
+
+        if (candidates.length === 0) {
+          // Fallback to any unoccupied cell
+          for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+              if (!isCellOccupied(x, y)) candidates.push({ x, y });
+            }
+          }
+        }
+
+        return candidates[Math.floor(Math.random() * candidates.length)] || { x: 10, y: 10 };
+      }
+
+      function spawnFood() {
+        const pos = findSafeFreeCell(1);
+        state.food = {
+          x: pos.x,
+          y: pos.y,
+          spawnedAt: performance.now()
+        };
+      }
+
+      function maybeSpawnBonus() {
+        if (state.bonusItem) return;
+        // 32% chance whenever regular food is eaten
+        if (Math.random() > 0.32) return;
+
+        const pos = findSafeFreeCell(2);
+        const type = (!state.hasShield && Math.random() < 0.38) ? 'SHIELD' : 'STAR';
+        const duration = 8000; // 8 seconds
+        state.bonusItem = {
+          x: pos.x,
+          y: pos.y,
+          type,
+          duration,
+          expiresAt: performance.now() + duration
+        };
+      }
+
+      function spawnParticles(gridX, gridY, color, count = 14) {
+        const cx = (gridX + 0.5) * cellPx;
+        const cy = (gridY + 0.5) * cellPx;
+
+        for (let i = 0; i < count; i++) {
+          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+          const speed = 1.2 + Math.random() * 3.4;
+          state.particles.push({
+            x: cx,
+            y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.025 + Math.random() * 0.02,
+            size: 2 + Math.random() * 3,
+            color
+          });
+        }
+      }
+
+      function spawnFloatingText(gridX, gridY, text, color = '#fde047') {
+        state.floatingTexts.push({
+          x: (gridX + 0.5) * cellPx,
+          y: gridY * cellPx,
+          text,
+          color,
+          life: 1
+        });
+      }
+
+      function triggerShake() {
+        canvasFrame.classList.remove('shake');
+        void canvasFrame.offsetWidth; // Force reflow
+        canvasFrame.classList.add('shake');
+      }
+
+      function showToast(message) {
+        levelToast.textContent = message;
+        levelToast.classList.add('show');
+        clearTimeout(levelToast._timer);
+        levelToast._timer = setTimeout(() => {
+          levelToast.classList.remove('show');
+        }, 1800);
+      }
+
+      function updateHUD() {
+        scoreVal.textContent = state.score;
+        highScoreVal.textContent = highScore;
+        levelVal.textContent = state.level;
+
+        if (state.combo > 1) {
+          comboBadge.textContent = `${state.combo}x COMBO`;
+          comboBadge.classList.add('active');
+        } else {
+          comboBadge.classList.remove('active');
+        }
+
+        shieldBadge.classList.toggle('active', state.hasShield);
+
+        const cfg = getLevelConfig(state.level);
+        levelNameLabel.textContent = `LVL ${state.level} • ${cfg.name}`;
+
+        if (cfg.pointsToNext === Infinity) {
+          nextLevelLabel.textContent = 'MAX LEVEL';
+          levelProgressFill.style.width = '100%';
+        } else {
+          const prevThreshold = state.level === 1 ? 0 : getLevelConfig(state.level - 1).pointsToNext;
+          const span = Math.max(10, cfg.pointsToNext - prevThreshold);
+          const currentInLevel = Math.max(0, state.score - prevThreshold);
+          const pct = Math.min(100, Math.round((currentInLevel / span) * 100));
+          nextLevelLabel.textContent = `Next: ${cfg.pointsToNext}`;
+          levelProgressFill.style.width = `${pct}%`;
+        }
+      }
+
+      // --------------------------------------------------------------------------
+      // 7. INITIALIZE / RESET RUN & LEVEL TRANSITIONS
+      // --------------------------------------------------------------------------
+      function setupLevel(lvl, preserveSnakeLength = false) {
+        state.level = lvl;
+        const cfg = getLevelConfig(lvl);
+        state.obstacles = cfg.obstacles();
+
+        const targetLen = preserveSnakeLength ? Math.max(4, state.snake.length) : 4;
+        // Safe spawn row near bottom-center where no obstacles exist across all 5 levels
+        const startX = 7;
+        const startY = 12;
+
+        state.snake = [];
+        for (let i = 0; i < targetLen; i++) {
+          state.snake.push({ x: Math.max(2, startX - i), y: startY });
+        }
+
+        state.dir = { x: 1, y: 0 };
+        state.inputQueue = [];
+        state.invulnTicks = 8; // Brief grace period on spawn/level change
+        state.bonusItem = null;
+        spawnFood();
+        updateHUD();
+      }
+
+      function startNewGame(startLvl = selectedStartLevel) {
+        sfx.init();
+        state.score = 0;
+        state.combo = 1;
+        state.lastEatTime = 0;
+        state.hasShield = false;
+        state.particles = [];
+        state.floatingTexts = [];
+
+        setupLevel(startLvl, false);
+        state.status = 'PLAYING';
+        state.lastStepTime = performance.now();
+
+        startOverlay.classList.add('hidden');
+        pauseOverlay.classList.add('hidden');
+        gameOverOverlay.classList.add('hidden');
+        pauseBtn.textContent = '⏸️';
+
+        showToast(`LEVEL ${startLvl}: ${getLevelConfig(startLvl).name}`);
+      }
+
+      function checkLevelProgression() {
+        const cfg = getLevelConfig(state.level);
+        if (cfg.pointsToNext !== Infinity && state.score >= cfg.pointsToNext) {
+          const nextLvl = state.level + 1;
+          sfx.levelUp();
+          spawnParticles(state.snake[0].x, state.snake[0].y, '#a855f7', 26);
+          setupLevel(nextLvl, true);
+          showToast(`LEVEL ${nextLvl}: ${getLevelConfig(nextLvl).name}`);
+        }
+      }
+
+      function triggerGameOver(reason) {
+        state.status = 'GAMEOVER';
+        sfx.gameOver();
+        triggerShake();
+
+        const head = state.snake[0];
+        if (head) spawnParticles(head.x, head.y, '#f43f5e', 28);
+
+        let isNewRecord = false;
+        if (state.score > highScore) {
+          highScore = state.score;
+          localStorage.setItem('neonSerpentHighScore', highScore);
+          isNewRecord = true;
+        }
+        updateHUD();
+
+        document.getElementById('deathReasonText').textContent = reason;
+        document.getElementById('finalScoreVal').textContent = state.score;
+        document.getElementById('finalBestVal').textContent = highScore;
+        document.getElementById('finalLevelVal').textContent = state.level;
+        document.getElementById('newRecordBadge').classList.toggle('hidden', !isNewRecord);
+
+        setTimeout(() => {
+          gameOverOverlay.classList.remove('hidden');
+        }, 320);
+      }
+
+      // --------------------------------------------------------------------------
+      // 8. SIMULATION TICK (GRID MOVEMENT & COLLISIONS)
+      // --------------------------------------------------------------------------
+      function stepSimulation(now) {
+        if (state.invulnTicks > 0) state.invulnTicks--;
+
+        // Expire timed bonus item
+        if (state.bonusItem && now >= state.bonusItem.expiresAt) {
+          state.bonusItem = null;
+        }
+
+        // Decay combo if too slow (> 3.6 seconds since last orb)
+        if (state.combo > 1 && now - state.lastEatTime > 3600) {
+          state.combo = 1;
+          updateHUD();
+        }
+
+        // Consume next valid direction from input queue
+        if (state.inputQueue.length > 0) {
+          state.dir = state.inputQueue.shift();
+        }
+
+        const head = state.snake[0];
+        const nextX = head.x + state.dir.x;
+        const nextY = head.y + state.dir.y;
+
+        // Check wall or obstacle collision
+        const hitWall = nextX < 0 || nextX >= GRID_SIZE || nextY < 0 || nextY >= GRID_SIZE;
+        const hitObstacle = !hitWall && state.obstacles.some(o => o.x === nextX && o.y === nextY);
+
+        if (hitWall || hitObstacle) {
+          if (state.hasShield) {
+            // Phase Shield saves the player!
+            state.hasShield = false;
+            state.invulnTicks = 6;
+            sfx.shieldBreak();
+            triggerShake();
+            spawnParticles(head.x, head.y, '#22d3ee', 22);
+            spawnFloatingText(head.x, head.y, 'SHIELD SAVED!', '#22d3ee');
+
+            if (hitWall) {
+              // Wrap cleanly across the arena when shield absorbs wall impact
+              const wrappedX = (nextX + GRID_SIZE) % GRID_SIZE;
+              const wrappedY = (nextY + GRID_SIZE) % GRID_SIZE;
+              advanceSnakeTo(wrappedX, wrappedY, now);
+            } else {
+              // Destroy the obstacle block hit by the shield!
+              state.obstacles = state.obstacles.filter(o => !(o.x === nextX && o.y === nextY));
+              advanceSnakeTo(nextX, nextY, now);
+            }
+            updateHUD();
+            return;
+          } else {
+            triggerGameOver(hitWall ? 'You hit the outer plasma boundary!' : 'You crashed into a cyber barrier!');
+            return;
+          }
+        }
+
+        // Check self-collision (skip tail tip because it moves away unless growing)
+        const willEatFood = state.food && nextX === state.food.x && nextY === state.food.y;
+        const bodyLimit = willEatFood ? state.snake.length : state.snake.length - 1;
+        const hitSelf = state.invulnTicks === 0 && state.snake.slice(0, bodyLimit).some(seg => seg.x === nextX && seg.y === nextY);
+
+        if (hitSelf) {
+          triggerGameOver('You tangled into your own neon tail!');
+          return;
+        }
+
+        advanceSnakeTo(nextX, nextY, now);
+      }
+
+      function advanceSnakeTo(nextX, nextY, now) {
+        const newHead = { x: nextX, y: nextY };
+        state.snake.unshift(newHead);
+
+        let grew = false;
+
+        // 1. Check Regular Orb
+        if (state.food && nextX === state.food.x && nextY === state.food.y) {
+          grew = true;
+          if (now - state.lastEatTime <= 3600) {
+            state.combo = Math.min(5, state.combo + 1);
+          } else {
+            state.combo = 1;
+          }
+          state.lastEatTime = now;
+
+          const points = 10 * state.combo;
+          state.score += points;
+
+          sfx.eat(state.combo);
+          spawnParticles(nextX, nextY, '#f43f5e', 14);
+          spawnFloatingText(
+            nextX,
+            nextY,
+            state.combo > 1 ? `+${points} (${state.combo}x)` : `+${points}`,
+            state.combo > 1 ? '#fde047' : '#fb7185'
+          );
+
+          spawnFood();
+          maybeSpawnBonus();
+          checkLevelProgression();
+        }
+
+        // 2. Check Timed Bonus / Shield
+        if (state.bonusItem && nextX === state.bonusItem.x && nextY === state.bonusItem.y) {
+          const item = state.bonusItem;
+          state.bonusItem = null;
+
+          if (item.type === 'STAR') {
+            state.score += 50;
+            sfx.bonus();
+            spawnParticles(nextX, nextY, '#f59e0b', 22);
+            spawnFloatingText(nextX, nextY, '+50 STAR!', '#fbbf24');
+            checkLevelProgression();
+          } else if (item.type === 'SHIELD') {
+            state.hasShield = true;
+            sfx.shieldPickup();
+            spawnParticles(nextX, nextY, '#22d3ee', 22);
+            spawnFloatingText(nextX, nextY, 'PHASE SHIELD!', '#22d3ee');
+          }
+        }
+
+        if (!grew) {
+          state.snake.pop();
+        }
+
+        updateHUD();
+      }
+
+      // --------------------------------------------------------------------------
+      // 9. RENDERING ENGINE (GLOWING NEON GRAPHICS)
+      // --------------------------------------------------------------------------
+      function draw(now = performance.now()) {
+        const w = GRID_SIZE * cellPx;
+        const h = GRID_SIZE * cellPx;
+
+        // Background fill
+        ctx.fillStyle = '#080c1c';
+        ctx.fillRect(0, 0, w, h);
+
+        // Subtle checkerboard grid cells
+        for (let y = 0; y < GRID_SIZE; y++) {
+          for (let x = 0; x < GRID_SIZE; x++) {
+            if ((x + y) % 2 === 0) {
+              ctx.fillStyle = 'rgba(30, 41, 59, 0.22)';
+              ctx.fillRect(x * cellPx, y * cellPx, cellPx, cellPx);
+            }
+          }
+        }
+
+        // Draw Obstacles
+        const lvlAccent = getLevelConfig(state.level).accent;
+        state.obstacles.forEach(obs => {
+          const ox = obs.x * cellPx;
+          const oy = obs.y * cellPx;
+          const pad = Math.max(1.5, cellPx * 0.08);
+
+          ctx.save();
+          ctx.shadowColor = lvlAccent;
+          ctx.shadowBlur = 8;
+          ctx.fillStyle = '#1e293b';
+          roundRect(ctx, ox + pad, oy + pad, cellPx - pad * 2, cellPx - pad * 2, 5);
+          ctx.fill();
+
+          ctx.strokeStyle = lvlAccent;
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+
+          // Inner diagonal slash detail
+          ctx.beginPath();
+          ctx.moveTo(ox + pad + 3, oy + cellPx - pad - 3);
+          ctx.lineTo(ox + cellPx - pad - 3, oy + pad + 3);
+          ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // Draw Regular Food Orb
+        if (state.food) {
+          const fx = (state.food.x + 0.5) * cellPx;
+          const fy = (state.food.y + 0.5) * cellPx;
+          const pulse = 1 + Math.sin(now * 0.008) * 0.12;
+          const r = cellPx * 0.34 * pulse;
+
+          ctx.save();
+          ctx.shadowColor = '#f43f5e';
+          ctx.shadowBlur = 14;
+          const grad = ctx.createRadialGradient(fx - r * 0.3, fy - r * 0.3, 1, fx, fy, r);
+          grad.addColorStop(0, '#fda4af');
+          grad.addColorStop(0.5, '#f43f5e');
+          grad.addColorStop(1, '#be123c');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(fx, fy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw Timed Bonus Item (Golden Star or Phase Shield)
+        if (state.bonusItem) {
+          const bx = (state.bonusItem.x + 0.5) * cellPx;
+          const by = (state.bonusItem.y + 0.5) * cellPx;
+          const remainingRatio = Math.max(0, (state.bonusItem.expiresAt - now) / state.bonusItem.duration);
+          const isShield = state.bonusItem.type === 'SHIELD';
+          const color = isShield ? '#22d3ee' : '#f59e0b';
+
+          ctx.save();
+          // Countdown ring around bonus item
+          ctx.beginPath();
+          ctx.arc(bx, by, cellPx * 0.44, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remainingRatio);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2.2;
+          ctx.stroke();
+
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 14;
+          ctx.fillStyle = color;
+
+          if (isShield) {
+            // Diamond shield core
+            const s = cellPx * 0.28;
+            ctx.beginPath();
+            ctx.moveTo(bx, by - s);
+            ctx.lineTo(bx + s, by);
+            ctx.lineTo(bx, by + s);
+            ctx.lineTo(bx - s, by);
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            // 5-point Star
+            drawStar(ctx, bx, by, 5, cellPx * 0.34, cellPx * 0.16);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        // Draw Snake Body & Head
+        const len = state.snake.length;
+        for (let i = len - 1; i >= 0; i--) {
+          const seg = state.snake[i];
+          const sx = seg.x * cellPx;
+          const sy = seg.y * cellPx;
+          const t = len > 1 ? i / (len - 1) : 0;
+
+          // Taper tail slightly
+          const inset = Math.max(1.2, cellPx * (0.07 + t * 0.14));
+          const size = cellPx - inset * 2;
+
+          ctx.save();
+          if (state.invulnTicks > 0 && state.invulnTicks % 2 === 1) {
+            ctx.globalAlpha = 0.55;
+          }
+
+          if (i === 0) {
+            // Glowing Snake Head
+            ctx.shadowColor = state.hasShield ? '#22d3ee' : '#34d399';
+            ctx.shadowBlur = 14;
+            ctx.fillStyle = state.hasShield ? '#22d3ee' : '#10b981';
+            roundRect(ctx, sx + 1, sy + 1, cellPx - 2, cellPx - 2, cellPx * 0.32);
+            ctx.fill();
+
+            // Shield Aura Ring on Head
+            if (state.hasShield) {
+              ctx.strokeStyle = '#a5f3fc';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
+
+            // Directional Eyes
+            drawSnakeEyes(ctx, sx, sy, cellPx, state.dir);
+          } else {
+            // Gradient Cyber Body Segments
+            const hue = (155 + i * 5) % 360;
+            ctx.fillStyle = state.hasShield
+              ? `hsla(${190 + i * 3}, 90%, 55%, ${1 - t * 0.35})`
+              : `hsla(${hue}, 88%, 52%, ${1 - t * 0.35})`;
+            roundRect(ctx, sx + inset, sy + inset, size, size, size * 0.32);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        // Draw Particle Explosions
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+          const p = state.particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.95;
+          p.vy *= 0.95;
+          p.life -= p.decay;
+
+          if (p.life <= 0) {
+            state.particles.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = p.life;
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw Floating Score Popups
+        for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+          const ft = state.floatingTexts[i];
+          ft.y -= 0.7;
+          ft.life -= 0.022;
+
+          if (ft.life <= 0) {
+            state.floatingTexts.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = ft.life;
+          ctx.font = `800 ${Math.max(11, Math.round(cellPx * 0.56))}px "Orbitron", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = ft.color;
+          ctx.shadowColor = 'rgba(0,0,0,0.85)';
+          ctx.shadowBlur = 6;
+          ctx.fillText(ft.text, ft.x, ft.y);
+          ctx.restore();
+        }
+      }
+
+      function drawSnakeEyes(ctx, sx, sy, size, dir) {
+        const eyeR = Math.max(1.8, size * 0.11);
+        const pupilR = eyeR * 0.52;
+        let e1, e2;
+
+        if (dir.x === 1) {
+          e1 = { x: sx + size * 0.72, y: sy + size * 0.3 };
+          e2 = { x: sx + size * 0.72, y: sy + size * 0.7 };
+        } else if (dir.x === -1) {
+          e1 = { x: sx + size * 0.28, y: sy + size * 0.3 };
+          e2 = { x: sx + size * 0.28, y: sy + size * 0.7 };
+        } else if (dir.y === -1) {
+          e1 = { x: sx + size * 0.3, y: sy + size * 0.28 };
+          e2 = { x: sx + size * 0.7, y: sy + size * 0.28 };
+        } else {
+          e1 = { x: sx + size * 0.3, y: sy + size * 0.72 };
+          e2 = { x: sx + size * 0.7, y: sy + size * 0.72 };
+        }
+
+        [e1, e2].forEach(e => {
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, eyeR, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#090d1e';
+          ctx.beginPath();
+          ctx.arc(e.x + dir.x * 0.8, e.y + dir.y * 0.8, pupilR, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      function roundRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+      }
+
+      function drawStar(ctx, cx, cy, spikes, outerR, innerR) {
+        let rot = (Math.PI / 2) * 3;
+        const step = Math.PI / spikes;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - outerR);
+        for (let i = 0; i < spikes; i++) {
+          ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
+          rot += step;
+          ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
+          rot += step;
+        }
+        ctx.closePath();
+      }
+
+      // --------------------------------------------------------------------------
+      // 10. MAIN ANIMATION LOOP
+      // --------------------------------------------------------------------------
+      function mainLoop(now) {
+        if (state.status === 'PLAYING') {
+          const stepInterval = getLevelConfig(state.level).speedMs;
+          if (now - state.lastStepTime >= stepInterval) {
+            state.lastStepTime = now;
+            stepSimulation(now);
+          }
+        }
+        draw(now);
+        state.animFrameId = requestAnimationFrame(mainLoop);
+      }
+
+      // --------------------------------------------------------------------------
+      // 11. INPUT HANDLING (KEYBOARD, SWIPE & D-PAD WITH BUFFER QUEUE)
+      // --------------------------------------------------------------------------
+      function queueDirection(newDir) {
+        if (state.status !== 'PLAYING') return;
+        const lastPlanned = state.inputQueue.length > 0
+          ? state.inputQueue[state.inputQueue.length - 1]
+          : state.dir;
+
+        // Prevent reversing directly into self or duplicate consecutive direction
+        if (lastPlanned.x + newDir.x === 0 && lastPlanned.y + newDir.y === 0) return;
+        if (lastPlanned.x === newDir.x && lastPlanned.y === newDir.y) return;
+
+        if (state.inputQueue.length < 2) {
+          state.inputQueue.push(newDir);
+        }
+      }
+
+      function togglePause() {
+        if (state.status === 'PLAYING') {
+          state.status = 'PAUSED';
+          pauseOverlay.classList.remove('hidden');
+          pauseBtn.textContent = '▶️';
+        } else if (state.status === 'PAUSED') {
+          state.status = 'PLAYING';
+          state.lastStepTime = performance.now();
+          pauseOverlay.classList.add('hidden');
+          pauseBtn.textContent = '⏸️';
+        }
+      }
+
+      window.addEventListener('keydown', e => {
+        const key = e.key.toLowerCase();
+        if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) {
+          e.preventDefault();
+        }
+
+        if (key === 'arrowup' || key === 'w') queueDirection({ x: 0, y: -1 });
+        else if (key === 'arrowdown' || key === 's') queueDirection({ x: 0, y: 1 });
+        else if (key === 'arrowleft' || key === 'a') queueDirection({ x: -1, y: 0 });
+        else if (key === 'arrowright' || key === 'd') queueDirection({ x: 1, y: 0 });
+        else if (key === ' ' || key === 'p') togglePause();
+        else if (key === 'r' && (state.status === 'PLAYING' || state.status === 'GAMEOVER')) {
+          startNewGame(selectedStartLevel);
+        }
+      });
+
+      // Touch Swipe Detection on Canvas
+      let touchStartX = 0;
+      let touchStartY = 0;
+
+      canvas.addEventListener('touchstart', e => {
+        if (e.touches.length > 0) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchmove', e => {
+        if (!touchStartX || !touchStartY || e.touches.length === 0) return;
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        const threshold = 22;
+
+        if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+          if (Math.abs(dx) > Math.abs(dy)) {
+            queueDirection(dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 });
+          } else {
+            queueDirection(dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 });
+          }
+          // Reset origin so continuous swiping works smoothly
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+
+      // On-Screen Mobile D-Pad Buttons
+      document.querySelectorAll('.dpad-btn').forEach(btn => {
+        const handleDir = (e) => {
+          e.preventDefault();
+          const dir = btn.dataset.dir;
+          if (dir === 'UP') queueDirection({ x: 0, y: -1 });
+          if (dir === 'DOWN') queueDirection({ x: 0, y: 1 });
+          if (dir === 'LEFT') queueDirection({ x: -1, y: 0 });
+          if (dir === 'RIGHT') queueDirection({ x: 1, y: 0 });
+        };
+        btn.addEventListener('touchstart', handleDir, { passive: false });
+        btn.addEventListener('mousedown', handleDir);
+      });
+
+      // Level Selector Chips on Start Screen
+      document.querySelectorAll('.lvl-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('.lvl-chip').forEach(c => c.classList.remove('selected'));
+          chip.classList.add('selected');
+          selectedStartLevel = parseInt(chip.dataset.lvl, 10);
+          setupLevel(selectedStartLevel, false);
+          draw();
+        });
+      });
+
+      // HUD & Modal Buttons
+      document.getElementById('startBtn').addEventListener('click', () => startNewGame(selectedStartLevel));
+      document.getElementById('playAgainBtn').addEventListener('click', () => startNewGame(selectedStartLevel));
+      document.getElementById('resumeBtn').addEventListener('click', togglePause);
+      document.getElementById('pauseRestartBtn').addEventListener('click', () => startNewGame(selectedStartLevel));
+      pauseBtn.addEventListener('click', togglePause);
+      restartTopBtn.addEventListener('click', () => startNewGame(selectedStartLevel));
+
+      soundBtn.addEventListener('click', () => {
+        const muted = sfx.toggleMute();
+        soundBtn.textContent = muted ? '🔇' : '🔊';
+      });
+
+      // --------------------------------------------------------------------------
+      // 12. BOOTSTRAP ON LOAD
+      // --------------------------------------------------------------------------
+      window.addEventListener('load', () => {
+        setupLevel(1, false);
+        resizeCanvas();
+        state.animFrameId = requestAnimationFrame(mainLoop);
+      });
+    })();
+  </script>
+</body>
+</html>
